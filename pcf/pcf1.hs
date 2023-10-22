@@ -106,18 +106,38 @@ fv (Let x t u) = nub $ fv t ++ delete x (fv u)
 cbv :: Env -> Term -> Value
 cbv e (Const n) = ValInt n
 cbv e (Var x) = case lookup x e of
-                  Just (Thunk (Fix y t) e') -> undefined
+                  Just (Thunk (Fix y t) e') -> cbv (extendEnv e' y (Thunk (Fix y t) e')) t
+                  Just (Thunk t e') -> cbv e' t
                   Just v -> v -- обычное (не оснащённое) значение
                   Nothing -> error ("Variable " ++ x ++ " is not bound.")
-cbv e (Abs x t) = undefined
-cbv e (App t u) = undefined
-cbv e (Plus t u) = undefined
-cbv e (Minus t u) = undefined
-cbv e (Times t u) = undefined
-cbv e (Ifz c t u) = undefined
-cbv e (Fix f t) = undefined
-cbv e (Let x t u) = undefined
+cbv e (Abs x t) = Closure x t e
+cbv e (App t u) = case cbv e t of
+                    Closure x t' e' -> cbv (extendEnv e' x (Thunk u e)) t'
+                    _ -> error "Applying a non-function value."
+cbv e (Plus t u) = case (cbv e t, cbv e u) of
+                     (ValInt n, ValInt m) -> ValInt (n + m)
+                     _ -> error "Invalid addition."
+cbv e (Minus t u) = case (cbv e t, cbv e u) of
+                      (ValInt n, ValInt m) -> ValInt (n - m)
+                      _ -> error "Invalid subtraction."
+cbv e (Times t u) = case (cbv e t, cbv e u) of
+                      (ValInt n, ValInt m) -> ValInt (n * m)
+                      _ -> error "Invalid multiplication."
+cbv e (Ifz c t u) = case cbv e c of
+                      ValInt 0 -> cbv e t
+                      ValInt _ -> cbv e u
+                      _ -> error "Invalid condition."
+cbv e (Fix f t) = cbv (extendEnv e f (Thunk (Fix f t) e)) t
+cbv e (Let x t u) = cbv (extendEnv e x (Thunk t e)) u
 
+emptyEnv :: Env
+emptyEnv = []
+
+runCbv :: Term -> Value
+runCbv = cbv emptyEnv
 -- Проверьте работу cbv на термах t1, ..., t5.
 -- Напишите функцию, вычисляющую факториал и проверьте ее работу
 -- с помощью cbv.
+
+fac :: Term
+fac = Fix "f" $ Abs "n" $ Ifz (Var "n") (Const 1) (Times (Var "n") $ App (Var "f") (Minus (Var "n") (Const 1)))
