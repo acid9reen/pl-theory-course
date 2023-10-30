@@ -1,17 +1,17 @@
 import Data.List
 import Control.Monad (when)
 
-data Term =
-    Const Int
-  | Var String
-  | Abs String Term
-  | App Term Term
-  | Plus Term Term
-  | Minus Term Term
-  | Times Term Term
-  | Ifz Term Term Term
-  | Fix String Term
-  | Let String Term Term
+data Term
+    = Const Int
+    | Var String
+    | Abs String Term
+    | App Term Term
+    | Plus Term Term
+    | Minus Term Term
+    | Times Term Term
+    | Ifz Term Term Term
+    | Fix String Term
+    | Let String Term Term
     deriving Show
 
 -- let x = s in t можно было не добавлять в ядро языка
@@ -26,10 +26,10 @@ llet x s t = App (Abs x t) s
 -- (Fix x t, e). В разделе 3.2 книге ДЛ обычные значения или пары
 -- такого вида называются оснащёнными значениями (extended values).
 
-data Value =
-    ValInt Int
-  | Closure String Term Env
-  | Thunk Term Env
+data Value
+    = ValInt Int
+    | Closure String Term Env
+    | Thunk Term Env
     deriving Show
 
 type Env = [(String, Value)]
