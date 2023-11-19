@@ -120,11 +120,27 @@ app = foldl App
 appr :: Term -> [Term] -> Term
 appr = foldr App
 
-
+-- Church numbers
 -- Пример: intToChurch 3 = \s\z. s (s (s z))
 intToChurch :: Int -> Term
 intToChurch n =
     Abs "f" $ Abs "x" (appr (Var "x") (replicate n (Var "f")))
+
+-- plus = λ m. λ n. λ s. λ z. m s (n s z)
+plus :: Term
+plus = Abs "m" $ Abs "n" $ Abs "s" $ Abs "z" $
+    App (App (Var "m") (Var "s")) (App (App (Var "n") (Var "s")) (Var "z"))
+
+-- times = λ m. λ n. m (plus n) 0
+times :: Term
+times = Abs "m" $ Abs "n" $ app (Var "m") [App plus (Var "n"), intToChurch 0]
+
+churchToInt :: Term -> Int
+churchToInt t =
+    let ValInt n = runCbv (app t [Abs "x" (Plus (Var "x") (Const 1)), Const 0]) in n
+
+checkOp :: Term -> Int -> Int -> Int
+checkOp t m n = churchToInt $ app t [intToChurch m, intToChurch n]
 
 -- Допишите функцию cbv, реализующую интерпретатор с окружениями
 -- и вызовом по значению, согласно правилам в разделе 3.2
@@ -197,9 +213,6 @@ runCbn = cbn emptyEnv
 -- Напишите функцию, вычисляющую факториал и проверьте ее работу
 -- с помощью cbv.
 
-churchToInt :: (Term -> Value) -> Term -> Int
-churchToInt i t =
-    let ValInt n = i (app t [Abs "x" (Plus (Var "x") (Const 1)), Const 0]) in n
 
 fac :: Term
 fac = Fix "f" $ Abs "n" $ Ifz (Var "n") (Const 1) (Times (Var "n") $ App (Var "f") (Minus (Var "n") (Const 1)))
