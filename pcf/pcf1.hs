@@ -1,3 +1,5 @@
+{-# LANGUAGE Strict #-}
+
 import Data.List
 import Control.Monad (when)
 
@@ -100,6 +102,16 @@ fv (Ifz c t u) = nub $ fv c ++ fv t ++ fv u
 fv (Fix f u) = delete f (fv u)
 fv (Let x t u) = nub $ fv t ++ delete x (fv u)
 
+-- Y = λf. (λx.f (xx)) (λx.f (xx))
+yCombinator :: Term
+yCombinator = Abs "f" $ App inner inner
+    where inner = Abs "x" $ App (Var "f") (App (Var "x") (Var "x"))
+
+
+-- Z = λf. (λx.f (λy. xxy)) (λx.f (λy. xxy))
+zCombinator = Abs "f" $ App inner inner
+    where inner = Abs "x" (App (Var "f") (Abs "y" (App (App (Var "x") (Var "x")) (Var "y"))))
+
 -- Допишите функцию cbv, реализующую интерпретатор с окружениями
 -- и вызовом по значению, согласно правилам в разделе 3.2
 -- книги Довека, Леви.
@@ -173,3 +185,12 @@ runCbn = cbn emptyEnv
 
 fac :: Term
 fac = Fix "f" $ Abs "n" $ Ifz (Var "n") (Const 1) (Times (Var "n") $ App (Var "f") (Minus (Var "n") (Const 1)))
+
+facFix :: Term
+facFix =  Abs "fact" (Abs "x" (Ifz (Var "x") (Const 1) (Times (Var "x") (App (Var "fact") (Minus (Var "x") (Const 1))))))
+
+yFac :: Term
+yFac = App yCombinator facFix
+
+zFac :: Term
+zFac = App zCombinator facFix
