@@ -112,6 +112,20 @@ yCombinator = Abs "f" $ App inner inner
 zCombinator = Abs "f" $ App inner inner
     where inner = Abs "x" (App (Var "f") (Abs "y" (App (App (Var "x") (Var "x")) (Var "y"))))
 
+
+-- Пример: app t [s1, s2, s3] = App (App (App t s1) s2) s3
+app :: Term -> [Term] -> Term
+app = foldl App
+
+appr :: Term -> [Term] -> Term
+appr = foldr App
+
+
+-- Пример: intToChurch 3 = \s\z. s (s (s z))
+intToChurch :: Int -> Term
+intToChurch n =
+    Abs "f" $ Abs "x" (appr (Var "x") (replicate n (Var "f")))
+
 -- Допишите функцию cbv, реализующую интерпретатор с окружениями
 -- и вызовом по значению, согласно правилам в разделе 3.2
 -- книги Довека, Леви.
@@ -182,6 +196,10 @@ runCbn = cbn emptyEnv
 -- Проверьте работу cbv на термах t1, ..., t5.
 -- Напишите функцию, вычисляющую факториал и проверьте ее работу
 -- с помощью cbv.
+
+churchToInt :: (Term -> Value) -> Term -> Int
+churchToInt i t =
+    let ValInt n = i (app t [Abs "x" (Plus (Var "x") (Const 1)), Const 0]) in n
 
 fac :: Term
 fac = Fix "f" $ Abs "n" $ Ifz (Var "n") (Const 1) (Times (Var "n") $ App (Var "f") (Minus (Var "n") (Const 1)))
