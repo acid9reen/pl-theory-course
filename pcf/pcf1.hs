@@ -2,6 +2,7 @@
 
 import Data.List
 import Control.Monad (when)
+import Text.XHtml (body)
 
 data Term
     = Const Int
@@ -246,25 +247,19 @@ churchToInt t =
 checkOp :: Term -> Int -> Int -> Int
 checkOp t m n = churchToInt $ app t [intToChurch m, intToChurch n]
 
-seqTmpl :: Term
-seqTmpl
-    = Abs "start"
-    $ Abs "count"
-    $ Ifz (Var "count")
-        (Var "start")
-        $ app (Var "seq")
-            [ Plus (Times (Var "start") (Const 2)) (Const 5)
-            , Minus (Var "count") (Const 1) ]
+seqBody :: Term
+seqBody
+    = Ifz (Var "count")
+    (Var "start")
+    $ app (Var "f")
+        [ Plus (Times (Var "start") (Const 2)) (Const 5)
+        , Minus (Var "count") (Const 1) ]
 
 seqFixFun :: Term
-seqFixFun
-    = FixFun "f" "start"
-    $ Abs "count"
-    $ Ifz (Var "count")
-        (Var "start")
-        $ app (Var "f")
-            [ Plus (Times (Var "start") (Const 2)) (Const 5)
-            , Minus (Var "count") (Const 1) ]
+seqFixFun = FixFun "f" "start" $ Abs "count" seqBody
+
+seqTmpl :: Term
+seqTmpl = Abs "start" $ Abs "count" seqBody
 
 seqFix :: Term
 seqFix = Fix "seq" seqTmpl
