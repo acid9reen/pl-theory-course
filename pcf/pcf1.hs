@@ -236,8 +236,21 @@ seqTmpl =
         app (Var "seq")
             [Plus (Times (Var "start") (Const 2)) (Const 5), Minus (Var "count") (Const 1)]
 
+seqFixFun :: Term
+seqFixFun
+    = FixFun "f" "start"
+    $ FixFun "inner" "count"
+    $ Ifz (Var "count")
+        (Var "start")
+        $ app (Var "f") [Plus (Times (Var "start") (Const 2)) (Const 5), Minus (Var "count") (Const 1)]
+
+seqFix :: Term
 seqFix = Fix "seq" seqTmpl
+
+seqY :: Term
 seqY = App yCombinator $ Abs "seq" seqTmpl
+
+seqZ :: Term
 seqZ = App zCombinator $ Abs "seq" seqTmpl
 
 cbvRC :: EnvRC -> Term -> ValueRC
