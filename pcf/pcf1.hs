@@ -139,7 +139,7 @@ cbvRC envRC (Ifz c t u) = case cbvRC envRC c of
     ValIntRC 0 -> cbvRC envRC t
     ValIntRC _ -> cbvRC envRC u
     _ -> error "Invalid condition."
-cbvRC envRC (Fix f t) = error "NO FIXES IN RC"
+cbvRC envRC (Fix f t) = error "No fix in cbvRC!"
 cbvRC envRC (FixFun f x t) = ClosureRC f x t envRC
 cbvRC envRC (Let x t u) = cbvRC (extendEnvRC envRC x (cbvRC envRC t)) u
 
@@ -247,13 +247,14 @@ checkOp :: Term -> Int -> Int -> Int
 checkOp t m n = churchToInt $ app t [intToChurch m, intToChurch n]
 
 seqTmpl :: Term
-seqTmpl =
-    Abs "start" $
-    Abs "count" $
-    Ifz (Var "count")
-        (Var "start") $
-        app (Var "seq")
-            [Plus (Times (Var "start") (Const 2)) (Const 5), Minus (Var "count") (Const 1)]
+seqTmpl
+    = Abs "start"
+    $ Abs "count"
+    $ Ifz (Var "count")
+        (Var "start")
+        $ app (Var "seq")
+            [ Plus (Times (Var "start") (Const 2)) (Const 5)
+            , Minus (Var "count") (Const 1) ]
 
 seqFixFun :: Term
 seqFixFun
@@ -261,7 +262,9 @@ seqFixFun
     $ Abs "count"
     $ Ifz (Var "count")
         (Var "start")
-        $ app (Var "f") [Plus (Times (Var "start") (Const 2)) (Const 5), Minus (Var "count") (Const 1)]
+        $ app (Var "f")
+            [ Plus (Times (Var "start") (Const 2)) (Const 5)
+            , Minus (Var "count") (Const 1) ]
 
 seqFix :: Term
 seqFix = Fix "seq" seqTmpl
@@ -273,8 +276,8 @@ seqZ :: Term
 seqZ = App zCombinator $ Abs "seq" seqTmpl
 
 fact :: Term
-fact =
-    FixFun "f" "n" $
-    Ifz (Var "n")
+fact
+    = FixFun "f" "n"
+    $ Ifz (Var "n")
         (Const 1)
-        (Times (Var "n") (App (Var "f") (Minus (Var "n") (Const 1))))
+        $ Times (Var "n") (App (Var "f") (Minus (Var "n") (Const 1)))
