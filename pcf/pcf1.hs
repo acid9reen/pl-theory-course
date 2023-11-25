@@ -37,6 +37,74 @@ data Value
 
 type Env = [(String, Value)]
 
+-- Список [(x1, v1), ..., (xn, vn)] соответствует окружению
+-- [(xn, vn), ..., (x1, v1)]. Напоминание: новые связывания
+-- добавляются в окружение справа (слайд 17 лекции 5).
+extendEnv :: Env -> String -> Value -> Env
+extendEnv e x v = (x, v) : e
+
+-- Call by name
+cbn :: Env -> Term -> Value
+cbn e (Const n) = ValInt n
+cbn e (Var x) = case lookup x e of
+    Just (Thunk (Fix y t) e') -> cbn (extendEnv e' y (Thunk (Fix y t) e')) t
+    Just (Thunk t e') -> cbn e' t
+    Just v -> v -- обычное (не оснащённое) значение
+    Nothing -> error ("Variable " ++ x ++ " is not bound.")
+cbn e (Abs x t) = Closure x t e
+cbn e (App t u) = case cbn e t of
+    Closure x t' e' -> cbn (extendEnv e' x (Thunk u e)) t'
+    _ -> error "Applying a non-function value."
+cbn e (Plus t u) = case (cbn e t, cbn e u) of
+    (ValInt n, ValInt m) -> ValInt (n + m)
+    _ -> error "Invalid addition."
+cbn e (Minus t u) = case (cbn e t, cbn e u) of
+    (ValInt n, ValInt m) -> ValInt (n - m)
+    _ -> error "Invalid subtraction."
+cbn e (Times t u) = case (cbn e t, cbn e u) of
+    (ValInt n, ValInt m) -> ValInt (n * m)
+    _ -> error "Invalid multiplication."
+cbn e (Ifz c t u) = case cbn e c of
+    ValInt 0 -> cbn e t
+    ValInt _ -> cbn e u
+    _ -> error "Invalid condition."
+cbn e (Fix f t) = cbn (extendEnv e f (Thunk (Fix f t) e)) t
+cbn e (FixFun f x t) = cbn e (Fix f (Abs x t))
+cbn e (Let x t u) = cbn (extendEnv e x (Thunk t e)) u
+
+runCbn :: Term -> Value
+runCbn = cbn []
+
+-- Call by value
+cbv :: Env -> Term -> Value
+cbv e (Const n) = ValInt n
+cbv e (Var x) = case lookup x e of
+    Just (Thunk (Fix y t) e') -> cbv (extendEnv e' y (Thunk (Fix y t) e')) t
+    Just v -> v -- обычное (не оснащённое) значение
+    Nothing -> error ("Variable " ++ x ++ " is not bound.")
+cbv e (Abs x t) = Closure x t e
+cbv e (App t u) = case cbv e t of
+    Closure x t' e' -> cbv (extendEnv e' x (cbv e u)) t'
+    _ -> error "Applying a non-function value."
+cbv e (Plus t u) = case (cbv e t, cbv e u) of
+    (ValInt n, ValInt m) -> ValInt (n + m)
+    _ -> error "Invalid addition."
+cbv e (Minus t u) = case (cbv e t, cbv e u) of
+    (ValInt n, ValInt m) -> ValInt (n - m)
+    _ -> error "Invalid subtraction."
+cbv e (Times t u) = case (cbv e t, cbv e u) of
+    (ValInt n, ValInt m) -> ValInt (n * m)
+    _ -> error "Invalid multiplication."
+cbv e (Ifz c t u) = case cbv e c of
+    ValInt 0 -> cbv e t
+    ValInt _ -> cbv e u
+    _ -> error "Invalid condition."
+cbv e (Fix f t) = cbv (extendEnv e f (Thunk (Fix f t) e)) t
+cbv e (FixFun f x t) = cbv e (Fix f (Abs x t))
+cbv e (Let x t u) = cbv (extendEnv e x (cbv e t)) u
+
+runCbv :: Term -> Value
+runCbv = cbv []
 
 data ValueRC
     = ValIntRC Int
@@ -45,15 +113,38 @@ data ValueRC
 
 type EnvRC = [(String, ValueRC)]
 
--- Список [(x1, v1), ..., (xn, vn)] соответствует окружению
--- [(xn, vn), ..., (x1, v1)]. Напоминание: новые связывания
--- добавляются в окружение справа (слайд 17 лекции 5).
-
-extendEnv :: Env -> String -> Value -> Env
-extendEnv e x v = (x, v) : e
-
 extendEnvRC :: EnvRC -> String -> ValueRC -> EnvRC
 extendEnvRC e x ~v = (x, v) : e
+
+-- Call by value recursive closures
+cbvRC :: EnvRC -> Term -> ValueRC
+cbvRC envRC (Const n) = ValIntRC n
+cbvRC envRC (Var x) = case lookup x envRC of
+    Just valRC -> valRC
+    Nothing -> error ("Variable " ++ x ++ " is not bound.")
+cbvRC envRC (Abs x t) = ClosureRC "rnd" x t envRC
+cbvRC envRC (App t u) = case (cbvRC envRC t, cbvRC envRC u) of
+    (ClosureRC f x t' envRC', u') -> cbvRC (extendEnvRC (extendEnvRC envRC' x u') f (ClosureRC f x t' envRC')) t'
+    _ -> error "Applying a non-function value."
+cbvRC envRC (Plus t u) = case (cbvRC envRC t, cbvRC envRC u) of
+    (ValIntRC n, ValIntRC m) -> ValIntRC (n + m)
+    _ -> error "Invalid addition."
+cbvRC envRC (Minus t u) = case (cbvRC envRC t, cbvRC envRC u) of
+    (ValIntRC n, ValIntRC m) -> ValIntRC (n - m)
+    _ -> error "Invalid subtraction."
+cbvRC envRC (Times t u) = case (cbvRC envRC t, cbvRC envRC u) of
+    (ValIntRC n, ValIntRC m) -> ValIntRC (n * m)
+    _ -> error "Invalid multiplication."
+cbvRC envRC (Ifz c t u) = case cbvRC envRC c of
+    ValIntRC 0 -> cbvRC envRC t
+    ValIntRC _ -> cbvRC envRC u
+    _ -> error "Invalid condition."
+cbvRC envRC (Fix f t) = error "NO FIXES IN RC"
+cbvRC envRC (FixFun f x t) = ClosureRC f x t envRC
+cbvRC envRC (Let x t u) = cbvRC (extendEnvRC envRC x (cbvRC envRC t)) u
+
+runCbvRC :: Term -> ValueRC
+runCbvRC = cbvRC []
 
 -- Термы для тестов
 
@@ -121,6 +212,7 @@ yCombinator = Abs "f" $ App inner inner
 
 
 -- Z = λf. (λx.f (λy. xxy)) (λx.f (λy. xxy))
+zCombinator :: Term
 zCombinator = Abs "f" $ App inner inner
     where inner = Abs "x" (App (Var "f") (Abs "y" (App (App (Var "x") (Var "x")) (Var "y"))))
 
@@ -154,79 +246,6 @@ churchToInt t =
 checkOp :: Term -> Int -> Int -> Int
 checkOp t m n = churchToInt $ app t [intToChurch m, intToChurch n]
 
--- Допишите функцию cbv, реализующую интерпретатор с окружениями
--- и вызовом по значению, согласно правилам в разделе 3.2
--- книги Довека, Леви.
-
-cbn :: Env -> Term -> Value
-cbn e (Const n) = ValInt n
-cbn e (Var x) = case lookup x e of
-    Just (Thunk (Fix y t) e') -> cbn (extendEnv e' y (Thunk (Fix y t) e')) t
-    Just (Thunk t e') -> cbn e' t
-    Just v -> v -- обычное (не оснащённое) значение
-    Nothing -> error ("Variable " ++ x ++ " is not bound.")
-cbn e (Abs x t) = Closure x t e
-cbn e (App t u) = case cbn e t of
-    Closure x t' e' -> cbn (extendEnv e' x (Thunk u e)) t'
-    _ -> error "Applying a non-function value."
-cbn e (Plus t u) = case (cbn e t, cbn e u) of
-    (ValInt n, ValInt m) -> ValInt (n + m)
-    _ -> error "Invalid addition."
-cbn e (Minus t u) = case (cbn e t, cbn e u) of
-    (ValInt n, ValInt m) -> ValInt (n - m)
-    _ -> error "Invalid subtraction."
-cbn e (Times t u) = case (cbn e t, cbn e u) of
-    (ValInt n, ValInt m) -> ValInt (n * m)
-    _ -> error "Invalid multiplication."
-cbn e (Ifz c t u) = case cbn e c of
-    ValInt 0 -> cbn e t
-    ValInt _ -> cbn e u
-    _ -> error "Invalid condition."
-cbn e (Fix f t) = cbn (extendEnv e f (Thunk (Fix f t) e)) t
-cbn e (FixFun f x t) = cbn e (Fix f (Abs x t))
-cbn e (Let x t u) = cbn (extendEnv e x (Thunk t e)) u
-
-cbv :: Env -> Term -> Value
-cbv e (Const n) = ValInt n
-cbv e (Var x) = case lookup x e of
-    Just (Thunk (Fix y t) e') -> cbv (extendEnv e' y (Thunk (Fix y t) e')) t
-    Just v -> v -- обычное (не оснащённое) значение
-    Nothing -> error ("Variable " ++ x ++ " is not bound.")
-cbv e (Abs x t) = Closure x t e
-cbv e (App t u) = case cbv e t of
-    Closure x t' e' -> cbv (extendEnv e' x (cbv e u)) t'
-    _ -> error "Applying a non-function value."
-cbv e (Plus t u) = case (cbv e t, cbv e u) of
-    (ValInt n, ValInt m) -> ValInt (n + m)
-    _ -> error "Invalid addition."
-cbv e (Minus t u) = case (cbv e t, cbv e u) of
-    (ValInt n, ValInt m) -> ValInt (n - m)
-    _ -> error "Invalid subtraction."
-cbv e (Times t u) = case (cbv e t, cbv e u) of
-    (ValInt n, ValInt m) -> ValInt (n * m)
-    _ -> error "Invalid multiplication."
-cbv e (Ifz c t u) = case cbv e c of
-    ValInt 0 -> cbv e t
-    ValInt _ -> cbv e u
-    _ -> error "Invalid condition."
-cbv e (Fix f t) = cbv (extendEnv e f (Thunk (Fix f t) e)) t
-cbv e (FixFun f x t) = cbv e (Fix f (Abs x t))
-cbv e (Let x t u) = cbv (extendEnv e x (cbv e t)) u
-
-emptyEnv :: Env
-emptyEnv = []
-
-runCbv :: Term -> Value
-runCbv = cbv emptyEnv
-
-
-runCbn :: Term -> Value
-runCbn = cbn emptyEnv
-
--- Проверьте работу cbv на термах t1, ..., t5.
--- Напишите функцию, вычисляющую факториал и проверьте ее работу
--- с помощью cbv.
-
 seqTmpl :: Term
 seqTmpl =
     Abs "start" $
@@ -253,38 +272,9 @@ seqY = App yCombinator $ Abs "seq" seqTmpl
 seqZ :: Term
 seqZ = App zCombinator $ Abs "seq" seqTmpl
 
-cbvRC :: EnvRC -> Term -> ValueRC
-cbvRC envRC (Const n) = ValIntRC n
-cbvRC envRC (Var x) = case lookup x envRC of
-    Just valRC -> valRC
-    Nothing -> error ("Variable " ++ x ++ " is not bound.")
-cbvRC envRC (Abs x t) = ClosureRC "rnd" x t envRC
-cbvRC envRC (App t u) = case (cbvRC envRC t, cbvRC envRC u) of
-    (ClosureRC f x t' envRC', u') -> cbvRC (extendEnvRC (extendEnvRC envRC' x u') f (ClosureRC f x t' envRC')) t'
-    _ -> error "Applying a non-function value."
-cbvRC envRC (Plus t u) = case (cbvRC envRC t, cbvRC envRC u) of
-    (ValIntRC n, ValIntRC m) -> ValIntRC (n + m)
-    _ -> error "Invalid addition."
-cbvRC envRC (Minus t u) = case (cbvRC envRC t, cbvRC envRC u) of
-    (ValIntRC n, ValIntRC m) -> ValIntRC (n - m)
-    _ -> error "Invalid subtraction."
-cbvRC envRC (Times t u) = case (cbvRC envRC t, cbvRC envRC u) of
-    (ValIntRC n, ValIntRC m) -> ValIntRC (n * m)
-    _ -> error "Invalid multiplication."
-cbvRC envRC (Ifz c t u) = case cbvRC envRC c of
-    ValIntRC 0 -> cbvRC envRC t
-    ValIntRC _ -> cbvRC envRC u
-    _ -> error "Invalid condition."
-cbvRC envRC (Fix f t) = error "NO FIXES IN RC"
-cbvRC envRC (FixFun f x t) = ClosureRC f x t envRC
-cbvRC envRC (Let x t u) = cbvRC (extendEnvRC envRC x (cbvRC envRC t)) u
-
 fact :: Term
 fact =
     FixFun "f" "n" $
     Ifz (Var "n")
         (Const 1)
         (Times (Var "n") (App (Var "f") (Minus (Var "n") (Const 1))))
-
-runCbvRC :: Term -> ValueRC
-runCbvRC = cbvRC []
