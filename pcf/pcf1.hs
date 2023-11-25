@@ -125,7 +125,8 @@ cbvRC envRC (Var x) = case lookup x envRC of
     Nothing -> error ("Variable " ++ x ++ " is not bound.")
 cbvRC envRC (Abs x t) = ClosureRC "rnd" x t envRC
 cbvRC envRC (App t u) = case (cbvRC envRC t, cbvRC envRC u) of
-    (ClosureRC f x t' envRC', u') -> cbvRC (extendEnvRC (extendEnvRC envRC' x u') f (ClosureRC f x t' envRC')) t'
+    (ClosureRC f x t' envRC', u') ->
+        cbvRC (extendEnvRC (extendEnvRC envRC' x u') f (ClosureRC f x t' envRC')) t'
     _ -> error "Applying a non-function value."
 cbvRC envRC (Plus t u) = case (cbvRC envRC t, cbvRC envRC u) of
     (ValIntRC n, ValIntRC m) -> ValIntRC (n + m)
@@ -240,12 +241,11 @@ plus = Abs "m" $ Abs "n" $ Abs "s" $ Abs "z" $
 times :: Term
 times = Abs "m" $ Abs "n" $ app (Var "m") [App plus (Var "n"), intToChurch 0]
 
-churchToInt :: Term -> Int
-churchToInt t =
-    let ValInt n = runCbv (app t [Abs "x" (Plus (Var "x") (Const 1)), Const 0]) in n
-
-checkOp :: Term -> Int -> Int -> Int
-checkOp t m n = churchToInt $ app t [intToChurch m, intToChurch n]
+checkOp :: (Term -> Value) -> Term -> Int -> Int -> Int
+checkOp r t m n = churchToInt $ app t [intToChurch m, intToChurch n]
+    where
+        { churchToInt t
+            = let ValInt n = r (app t [Abs "x" (Plus (Var "x") (Const 1)), Const 0]) in n }
 
 seqBody :: Term
 seqBody
