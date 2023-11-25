@@ -239,7 +239,7 @@ seqTmpl =
 seqFixFun :: Term
 seqFixFun
     = FixFun "f" "start"
-    $ FixFun "inner" "count"
+    $ Abs "count"
     $ Ifz (Var "count")
         (Var "start")
         $ app (Var "f") [Plus (Times (Var "start") (Const 2)) (Const 5), Minus (Var "count") (Const 1)]
