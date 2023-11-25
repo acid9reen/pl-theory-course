@@ -213,15 +213,15 @@ runCbn = cbn emptyEnv
 -- Напишите функцию, вычисляющую факториал и проверьте ее работу
 -- с помощью cbv.
 
+seqTmpl :: Term
+seqTmpl =
+    Abs "start" $
+    Abs "count" $
+    Ifz (Var "count")
+        (Var "start") $
+        app (Var "seq")
+            [Plus (Times (Var "start") (Const 2)) (Const 5), Minus (Var "count") (Const 1)]
 
-fac :: Term
-fac = Fix "f" $ Abs "n" $ Ifz (Var "n") (Const 1) (Times (Var "n") $ App (Var "f") (Minus (Var "n") (Const 1)))
-
-facFix :: Term
-facFix =  Abs "fact" (Abs "x" (Ifz (Var "x") (Const 1) (Times (Var "x") (App (Var "fact") (Minus (Var "x") (Const 1))))))
-
-yFac :: Term
-yFac = App yCombinator facFix
-
-zFac :: Term
-zFac = App zCombinator facFix
+seqFix = Fix "seq" seqTmpl
+seqY = App yCombinator $ Abs "seq" seqTmpl
+seqZ = App zCombinator $ Abs "seq" seqTmpl
