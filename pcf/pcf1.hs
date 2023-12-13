@@ -309,7 +309,7 @@ toDB = loop [] where
     loop :: [String] -> Term -> TermDB
     loop e (Abs x t) = AbsDB $ loop (x:e) t
     loop e (Fix x t) = FixDB $ loop (x:e) t
-    loop e (FixFun f x t) = FixFunDB $ loop (f:x:e) t
+    loop e (FixFun f x t) = FixFunDB $ loop (x:f:e) t
     loop e (Let x t u) = LetDB (loop e t) (loop (x:e) u)
     loop e (Var x) = VarDB $ case elemIndex x e of
         Just n -> n
