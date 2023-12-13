@@ -275,4 +275,48 @@ fact
     = FixFun "f" "n"
     $ Ifz (Var "n")
         (Const 1)
-        $ Times (Var "n") (App (Var "f") (Minus (Var "n") (Const 1)))
+        $ Times (Var "n") $ App (Var "f") $ Minus (Var "n") (Const 1)
+
+
+-- <--------DB Indexes---------->
+
+
+data TermDB
+    = ConstDB Int
+    | VarDB Int
+    | AbsDB TermDB
+    | AppDB TermDB TermDB
+    | PlusDB TermDB TermDB
+    | MinusDB TermDB TermDB
+    | TimesDB TermDB TermDB
+    | IfzDB TermDB TermDB TermDB
+    | FixDB TermDB
+    | LetDB TermDB TermDB
+    | FixFunDB TermDB
+    deriving Show
+
+data ValueDB
+    = ValIntDB Int
+    | ClosureDB TermDB EnvDB
+    | ThunkDB TermDB EnvDB
+    deriving Show
+
+type EnvDB = [ValueDB]
+
+
+toDB :: Term -> TermDB
+toDB = loop [] where
+    loop :: [String] -> Term -> TermDB
+    loop e (Abs x t) = AbsDB $ loop (x:e) t
+    loop e (Fix x t) = FixDB $ loop (x:e) t
+    loop e (FixFun f x t) = FixFunDB $ loop (f:x:e) t
+    loop e (Let x t u) = LetDB (loop e t) (loop (x:e) u)
+    loop e (Var x) = VarDB $ case elemIndex x e of
+        Just n -> n
+        Nothing -> error ("There is no variable" ++ x ++ "in env")
+    loop e (Const c) = ConstDB c
+    loop e (App t u) = AppDB (loop e t) (loop e u)
+    loop e (Plus t u) = PlusDB (loop e t) (loop e u)
+    loop e (Minus t u) = MinusDB (loop e t) (loop e u)
+    loop e (Times t u) = TimesDB (loop e t) (loop e u)
+    loop e (Ifz c t u) = IfzDB (loop e c) (loop e t) (loop e u)
