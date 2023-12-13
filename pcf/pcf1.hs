@@ -320,3 +320,34 @@ toDB = loop [] where
     loop e (Minus t u) = MinusDB (loop e t) (loop e u)
     loop e (Times t u) = TimesDB (loop e t) (loop e u)
     loop e (Ifz c t u) = IfzDB (loop e c) (loop e t) (loop e u)
+
+
+cbvDB :: EnvDB -> TermDB -> ValueDB
+cbvDB e (ConstDB n) = ValIntDB n
+cbvDB e (VarDB x) = case e !! x of
+    (ThunkDB (FixDB t) e') -> cbvDB (ThunkDB (FixDB t) e' : e) t
+    v -> v -- обычное (не оснащённое) значение
+cbvDB e (AbsDB t) = ClosureDB t e
+cbvDB e (AppDB t u) = case cbvDB e t of
+    ClosureDB t' e' -> cbvDB (cbvDB e u : e') t'
+    _ -> error "Applying a non-function value."
+cbvDB e (PlusDB t u) = case (cbvDB e t, cbvDB e u) of
+    (ValIntDB n, ValIntDB m) -> ValIntDB (n + m)
+    _ -> error "Invalid addition."
+cbvDB e (MinusDB t u) = case (cbvDB e t, cbvDB e u) of
+    (ValIntDB n, ValIntDB m) -> ValIntDB (n - m)
+    _ -> error "Invalid subtraction."
+cbvDB e (TimesDB t u) = case (cbvDB e t, cbvDB e u) of
+    (ValIntDB n, ValIntDB m) -> ValIntDB (n * m)
+    _ -> error "Invalid multiplication."
+cbvDB e (IfzDB c t u) = case cbvDB e c of
+    ValIntDB 0 -> cbvDB e t
+    ValIntDB _ -> cbvDB e u
+    _ -> error "Invalid condition."
+cbvDB e (FixDB t) = cbvDB (ThunkDB (FixDB t) e : e) t
+cbvDB e (FixFunDB t) = cbvDB e (FixDB (AbsDB t))
+cbvDB e (LetDB t u) = cbvDB (cbvDB e t : e) u
+
+
+runCbvDB :: Term -> ValueDB
+runCbvDB t = cbvDB [] (toDB t)
