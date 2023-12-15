@@ -48,7 +48,7 @@ extendEnv e x v = (x, v) : e
 cbn :: Env -> Term -> Value
 cbn e (Const n) = ValInt n
 cbn e (Var x) = case lookup x e of
-    Just (Thunk (Fix y t) e') -> cbn (extendEnv e' y (Thunk (Fix y t) e')) t
+    Just (Thunk (Fix y t) e') -> cbn e' (Fix y t)
     Just (Thunk t e') -> cbn e' t
     Just v -> v -- обычное (не оснащённое) значение
     Nothing -> error ("Variable " ++ x ++ " is not bound.")
@@ -80,7 +80,7 @@ runCbn = cbn []
 cbv :: Env -> Term -> Value
 cbv e (Const n) = ValInt n
 cbv e (Var x) = case lookup x e of
-    Just (Thunk (Fix y t) e') -> cbv (extendEnv e' y (Thunk (Fix y t) e')) t
+    Just (Thunk (Fix y t) e') -> cbv e' (Fix y t)
     Just v -> v -- обычное (не оснащённое) значение
     Nothing -> error ("Variable " ++ x ++ " is not bound.")
 cbv e (Abs x t) = Closure x t e
@@ -325,7 +325,7 @@ toDB = loop [] where
 cbvDB :: EnvDB -> TermDB -> ValueDB
 cbvDB e (ConstDB n) = ValIntDB n
 cbvDB e (VarDB x) = case e !! x of
-    (ThunkDB (FixDB t) e') -> cbvDB (ThunkDB (FixDB t) e' : e) t
+    (ThunkDB (FixDB t) e') -> cbvDB e' (FixDB t)
     v -> v -- обычное (не оснащённое) значение
 cbvDB e (AbsDB t) = ClosureDB t e
 cbvDB e (AppDB t u) = case cbvDB e t of
