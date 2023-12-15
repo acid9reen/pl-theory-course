@@ -262,13 +262,13 @@ seqTmpl :: Term
 seqTmpl = Abs "start" $ Abs "count" seqBody
 
 seqFix :: Term
-seqFix = Fix "seq" seqTmpl
+seqFix = Fix "f" seqTmpl
 
 seqY :: Term
-seqY = App yCombinator $ Abs "seq" seqTmpl
+seqY = App yCombinator $ Abs "f" seqTmpl
 
 seqZ :: Term
-seqZ = App zCombinator $ Abs "seq" seqTmpl
+seqZ = App zCombinator $ Abs "f" seqTmpl
 
 fact :: Term
 fact
