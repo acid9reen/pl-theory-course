@@ -44,6 +44,9 @@ type Env = [(String, Value)]
 extendEnv :: Env -> String -> Value -> Env
 extendEnv e x v = (x, v) : e
 
+extendEnvRV :: Env -> String -> Value -> Env
+extendEnvRV e x ~v = (x, v) : e
+
 -- Call by name
 cbn :: Env -> Term -> Value
 cbn e (Const n) = ValInt n
@@ -147,6 +150,36 @@ cbvRC envRC (Let x t u) = cbvRC (extendEnvRC envRC x (cbvRC envRC t)) u
 
 runCbvRC :: Term -> ValueRC
 runCbvRC = cbvRC []
+
+-- Call by value rational values
+cbvRV :: Env -> Term -> Value
+cbvRV e (Const n) = ValInt n
+cbvRV e (Var x) = case lookup x e of
+    Just v -> v
+    Nothing -> error ("Variable " ++ x ++ " is not bound.")
+cbvRV e (Abs x t) = Closure x t e
+cbvRV e (App t u) = case cbvRV e t of
+    Closure x t' e' -> cbvRV (extendEnvRV e' x (cbvRV e u)) t'
+    _ -> error "Applying a non-function value."
+cbvRV e (Plus t u) = case (cbvRV e t, cbvRV e u) of
+    (ValInt n, ValInt m) -> ValInt (n + m)
+    _ -> error "Invalid addition."
+cbvRV e (Minus t u) = case (cbvRV e t, cbvRV e u) of
+    (ValInt n, ValInt m) -> ValInt (n - m)
+    _ -> error "Invalid subtraction."
+cbvRV e (Times t u) = case (cbvRV e t, cbvRV e u) of
+    (ValInt n, ValInt m) -> ValInt (n * m)
+    _ -> error "Invalid multiplication."
+cbvRV e (Ifz c t u) = case cbvRV e c of
+    ValInt 0 -> cbvRV e t
+    ValInt _ -> cbvRV e u
+    _ -> error "Invalid condition."
+cbvRV e (Fix f t) = error "No fix in cbvRV!"
+cbvRV e (FixFun f x t) = let rc = Closure x t (extendEnvRV e f rc) in rc
+cbvRV e (Let x t u) = cbvRV (extendEnvRV e x (cbvRV e t)) u
+
+runCbvRV :: Term -> Value
+runCbvRV = cbvRV []
 
 -- Термы для тестов
 
